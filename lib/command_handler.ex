@@ -9,6 +9,8 @@ defmodule ReminderBot.CommandHandler do
         |> String.replace("  ", " ")
         |> String.split(" ", parts: 2)
         |> handle_command(id)
+      %{"callback_query" => %{"data" => data, "message" => %{"chat" => %{"id" => id}, "text" => text}}} ->
+        handle_command([data], id)
       _ ->
         IO.puts inspect params
     end
@@ -19,6 +21,7 @@ defmodule ReminderBot.CommandHandler do
   defp handle_command([command, options], id) do
     case command do
       "/id" -> send_to_chat(id, id)
+      "/i"  -> send_to_chat_with_keyboard(id, ["/s", "/w", "/d"])
       "/s"  -> handle_saving(options, id)
       "/w"  -> handle_watching(options, id)
       "/d"  -> handle_deleting(options, id)
