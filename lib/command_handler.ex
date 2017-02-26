@@ -1,5 +1,8 @@
 defmodule ReminderBot.CommandHandler do
+  import Ecto.Query
   import ReminderBot.Notificator
+  alias ReminderBot.Repo, as: DB
+  alias ReminderBot.Task
   @help_text "Пожалуйста, используйте следующие команды:\nid - узнать id текущего чата"
 
   def handle_connection_request(%Plug.Conn{params: params} = conn) do
@@ -23,53 +26,48 @@ defmodule ReminderBot.CommandHandler do
       "/id" -> send_to_chat(id, id)
       "/i"  -> send_to_chat_with_keyboard(id, ["/s", "/w", "/d"])
       "/s"  -> handle_saving(options, id)
-      "/w"  -> handle_watching(options, id)
-      "/d"  -> handle_deleting(options, id)
+      # "/w"  -> handle_watching(options, id)
+      # "/d"  -> handle_deleting(options, id)
           _ -> send_to_chat(id, @help_text)
     end
   end
 
   defp handle_saving(nil, id), do: send_to_chat id, "Не введены опции"
   defp handle_saving(options, id) when is_binary(options) do
-    splitted_options = String.split(options, " ", parts: 3)
-    case splitted_options do
-      [date, time, text] ->
-        {:ok, connection} = Redix.start_link()
-        Redix.command(connection, ["rpush", date <> time, text])
-        |> send_result(id)
-      _ ->
-        send_to_chat id, "Ошибочный ввод"
+    with [date, time, text]  <- String.split(options, " ", parts: 3),
+         {:ok, remind_at, _} <- DateTime.from_iso8601("#{date}T#{time}:00Z") do
+         %Task{text: text, remind_at: remind_at}
+           |> DB.insert
+           |> send_result(id)
+    else
+      _ -> send_to_chat id, "Ошибочный ввод"
     end
   end
 
-  defp handle_watching(nil, id), do: send_to_chat id, "Не введены опции"
-  defp handle_watching(options, id) when is_binary(options) do
-    splitted_options = String.split(options, " ", parts: 2)
-    case splitted_options do
-      [date, time] ->
-        {:ok, connection} = Redix.start_link()
-        Redix.command(connection, ["lrange", date <> time, "0", "-1"])
-        |> send_result(id)
-      _ ->
-        send_to_chat id, "Ошибочный ввод"
-    end
-  end
+  # defp handle_watching(nil, id), do: send_to_chat id, "Не введены опции"
+  # defp handle_watching(options, id) when is_binary(options) do
+  #   splitted_options = String.split(options, " ", parts: 2)
+  #   case splitted_options do
+  #     [date, time] ->
+  #       IO.puts "will"
+  #     _ ->
+  #       send_to_chat id, "Ошибочный ввод"
+  #   end
+  # end
 
-  defp handle_deleting(nil, id), do: send_to_chat id, "Не введены опции"
-  defp handle_deleting(options, id) when is_binary(options) do
-    splitted_options = String.split(options, " ", parts: 2)
-    case splitted_options do
-      [date, time] ->
-        {:ok, connection} = Redix.start_link()
-        Redix.command(connection, ["del", date <> time])
-        |> send_result(id)
-      _ ->
-        send_to_chat id, "Ошибочный ввод"
-    end
-  end
+  # defp handle_deleting(nil, id), do: send_to_chat id, "Не введены опции"
+  # defp handle_deleting(options, id) when is_binary(options) do
+  #   splitted_options = String.split(options, " ", parts: 2)
+  #   case splitted_options do
+  #     [date, time] ->
+  #       IO.puts "will"
+  #     _ ->
+  #       send_to_chat id, "Ошибочный ввод"
+  #   end
+  # end
 
-  def send_result({:ok, value}, id) when is_integer(value), do: send_to_chat(id, "OK")
-  def send_result({:ok, value}, id) when is_list(value), do: send_to_chat(id, inspect(value))
+  def send_result({:ok, _}, id) , do: send_to_chat(id, "OK")
+  # def send_result({:ok, value}, id) when is_list(value), do: send_to_chat(id, inspect(value))
   def send_result({_, reason}, id) do
     send_to_chat(id, "Не получилось сохранить (#{inspect reason})")
   end

@@ -30,3 +30,10 @@ use Mix.Config
 #     import_config "#{Mix.env}.exs"
 
 config :reminder_bot, token: ""
+config :reminder_bot, ecto_repos: [ReminderBot.Repo]
+config :reminder_bot, ReminderBot.Repo,
+  adapter: Ecto.Adapters.Postgres,
+  database: "database",
+  username: "username",
+  password: "password",
+  hostname: "localhost"

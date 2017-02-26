@@ -16,7 +16,16 @@ defmodule ReminderBot.Mixfile do
   def application do
     # Specify extra applications you'll use from Erlang/Elixir
     [
-      extra_applications: [:logger, :plug, :cowboy, :redix],
+      extra_applications: [
+        :logger,
+        :plug,
+        :cowboy,
+        :redix,
+        :quantum,
+        :ecto,
+        :postgrex,
+        :timex_ecto
+      ],
       mod: {ReminderBot, []},
       env: [cowboy_port: 8080]
     ]
@@ -37,7 +46,12 @@ defmodule ReminderBot.Mixfile do
       {:cowboy, "~> 1.0"},
       {:poison, "~> 3.0"},
       {:httpoison, "~> 0.10.0"},
-      {:redix, ">= 0.0.0"}
+      {:redix, ">= 0.0.0"},
+      {:quantum, ">= 1.9.0"},
+      {:ecto, "~> 2.1"},
+      {:postgrex, ">= 0.0.0"},
+      {:timex, "~> 3.0"},
+      {:timex_ecto, "~> 3.0"}
     ]
   end
 end
