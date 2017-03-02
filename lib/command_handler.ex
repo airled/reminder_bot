@@ -3,72 +3,89 @@ defmodule ReminderBot.CommandHandler do
   import ReminderBot.Notificator
   alias ReminderBot.Repo, as: DB
   alias ReminderBot.Task
-  @help_text "Пожалуйста, используйте следующие команды:\nid - узнать id текущего чата"
+  @help_text "Пожалуйста, используйте следующие команды:\n/id - узнать id текущего чата\n/s или /start - добавить новое напоминание"
 
   def handle_connection_request(%Plug.Conn{params: params} = conn) do
     case params do
-      %{"message" => %{"chat" => %{"id" => id}, "text" => text}} ->
+      %{"message" => %{"chat" => %{"id" => id}, "text" => text, "message_id" => message_id}} ->
         text
         |> String.replace("  ", " ")
         |> String.split(" ", parts: 2)
-        |> handle_command(id)
-      %{"callback_query" => %{"data" => data, "message" => %{"chat" => %{"id" => id}, "text" => text}}} ->
-        handle_command([data], id)
+        |> handle_command(id, message_id, text)
+      %{"callback_query" => %{
+        "data" => data,
+        "message" => %{"chat" => %{"id" => id}, "text" => text, "message_id" => message_id}
+      }} ->
+        handle_command([data], id, message_id, text)
       _ ->
         IO.puts inspect params
     end
   end
 
-  defp handle_command(x, _) when not is_list(x), do: nil
-  defp handle_command([command], id), do: handle_command([command, nil], id)
-  defp handle_command([command, options], id) do
+  defp handle_command(x, _, _, _) when not is_list(x), do: nil
+  defp handle_command([command], id, message_id, text) do
+    handle_command([command, nil], id, message_id, text)
+  end
+  defp handle_command([command, options], id, message_id, text) do
     case command do
-      "/id" -> send_to_chat(id, id)
-      "/i"  -> send_to_chat_with_keyboard(id, ["/s", "/w", "/d"])
-      "/s"  -> handle_saving(options, id)
-      # "/w"  -> handle_watching(options, id)
-      # "/d"  -> handle_deleting(options, id)
+      "/id" ->
+        send_to_chat(id, id)
+      "/s"  ->
+        clear_user_awaiting(id)
+        send_initial_calendar_for_month(id, message_id)
+      "change_week_" <> week_shift ->
+        send_calendar_for_month(id, message_id, (Integer.parse(week_shift) |> elem(0)))
+      "get_hours_for_" <> date ->
+        send_hours_for_date(id, date, message_id)
+      "await" <> datetime ->
+        await_notification_text(datetime, id, message_id)
+      _ ->
+        check_for_awaiting(id, message_id, text)
+    end
+  end
+
+  defp check_for_awaiting(id, message_id, text) do
+    {:ok, connection} = Redix.start_link()
+    {:ok, value} = Redix.command(connection, ["get", id])
+    case value do
+      nil ->
+        send_to_chat(id, @help_text)
+      "" ->
+        send_to_chat(id, @help_text)
+      _ ->
+
+        with [previous_message_id, day, month, year, hour] <- String.split(value, "/"),
+             previous_message_id_as_integer <- Integer.parse(previous_message_id) |> elem(0) do
+
+            if message_id == previous_message_id_as_integer + 1 do
+              handle_saving({day, month, year, hour}, id, text)
+            else
+              send_to_chat(id, @help_text)
+            end
+            clear_user_awaiting(id)
+
+        else
           _ -> send_to_chat(id, @help_text)
+        end
+
     end
   end
 
-  defp handle_saving(nil, id), do: send_to_chat id, "Не введены опции"
-  defp handle_saving(options, id) when is_binary(options) do
-    with [date, time, text]  <- String.split(options, " ", parts: 3),
-         {:ok, remind_at, _} <- DateTime.from_iso8601("#{date}T#{time}:00Z") do
-         %Task{text: text, remind_at: remind_at}
-           |> DB.insert
-           |> send_result(id)
-    else
-      _ -> send_to_chat id, "Ошибочный ввод"
-    end
+  defp handle_saving({day, month, year, hour}, id, text) do
+    padded_hour = String.pad_leading(hour, 2, "0")
+    {:ok, remind_at, _} = DateTime.from_iso8601("20#{year}-#{month}-#{day}T#{padded_hour}:00:00Z")
+    %Task{text: text, remind_at: remind_at}
+      |> DB.insert
+      |> send_saving_result(id)
   end
 
-  # defp handle_watching(nil, id), do: send_to_chat id, "Не введены опции"
-  # defp handle_watching(options, id) when is_binary(options) do
-  #   splitted_options = String.split(options, " ", parts: 2)
-  #   case splitted_options do
-  #     [date, time] ->
-  #       IO.puts "will"
-  #     _ ->
-  #       send_to_chat id, "Ошибочный ввод"
-  #   end
-  # end
+  defp clear_user_awaiting(id) do
+    {:ok, connection} = Redix.start_link()
+    {:ok, value} = Redix.command(connection, ["set", id, ""])
+  end
 
-  # defp handle_deleting(nil, id), do: send_to_chat id, "Не введены опции"
-  # defp handle_deleting(options, id) when is_binary(options) do
-  #   splitted_options = String.split(options, " ", parts: 2)
-  #   case splitted_options do
-  #     [date, time] ->
-  #       IO.puts "will"
-  #     _ ->
-  #       send_to_chat id, "Ошибочный ввод"
-  #   end
-  # end
-
-  def send_result({:ok, _}, id) , do: send_to_chat(id, "OK")
-  # def send_result({:ok, value}, id) when is_list(value), do: send_to_chat(id, inspect(value))
-  def send_result({_, reason}, id) do
+  defp send_saving_result({:ok, _}, id) , do: send_to_chat(id, "Сохранено")
+  defp send_saving_result({_, reason}, id) do
     send_to_chat(id, "Не получилось сохранить (#{inspect reason})")
   end
 end
