@@ -29,12 +29,18 @@ defmodule ReminderBot.CommandHandler do
   defp handle_command([command, options], id, message_id, text) do
     case command do
       "/id" ->
-        send_to_chat(id, id)
-      "/s"  ->
         clear_user_awaiting(id)
-        send_initial_calendar_for_month(id, message_id)
+        update_inline(id, message_id - 1)
+        send_to_chat(id, id)
+      x when x == "/s" or x == "/start" ->
+        clear_user_awaiting(id)
+        update_inline(id, message_id - 1)
+        send_days(id, message_id)
+      "/c" ->
+        clear_user_awaiting(id)
+        update_inline(id, message_id - 1, "Отменено")
       "change_week_" <> week_shift ->
-        send_calendar_for_month(id, message_id, (Integer.parse(week_shift) |> elem(0)))
+        send_days(id, message_id, (Integer.parse(week_shift) |> elem(0)))
       "get_hours_for_" <> date ->
         send_hours_for_date(id, date, message_id)
       "await" <> datetime ->
@@ -48,9 +54,8 @@ defmodule ReminderBot.CommandHandler do
     {:ok, connection} = Redix.start_link()
     {:ok, value} = Redix.command(connection, ["get", id])
     case value do
-      nil ->
-        send_to_chat(id, @help_text)
-      "" ->
+      x when x == nil or x == "" ->
+        update_inline(id, message_id - 1)
         send_to_chat(id, @help_text)
       _ ->
 
@@ -60,12 +65,15 @@ defmodule ReminderBot.CommandHandler do
             if message_id == previous_message_id_as_integer + 1 do
               handle_saving({day, month, year, hour}, id, text)
             else
+              update_inline(id, message_id - 1)
               send_to_chat(id, @help_text)
             end
             clear_user_awaiting(id)
 
         else
-          _ -> send_to_chat(id, @help_text)
+          _ ->
+            update_inline(id, message_id - 1)
+            send_to_chat(id, @help_text)
         end
 
     end
@@ -74,9 +82,9 @@ defmodule ReminderBot.CommandHandler do
   defp handle_saving({day, month, year, hour}, id, text) do
     padded_hour = String.pad_leading(hour, 2, "0")
     {:ok, remind_at, _} = DateTime.from_iso8601("20#{year}-#{month}-#{day}T#{padded_hour}:00:00Z")
-    %Task{text: text, remind_at: remind_at}
-      |> DB.insert
-      |> send_saving_result(id)
+    %Task{text: text, remind_at: remind_at, chat_id: Integer.to_string(id)}
+    |> DB.insert
+    |> send_saving_result(id)
   end
 
   defp clear_user_awaiting(id) do

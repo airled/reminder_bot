@@ -15,7 +15,7 @@ defmodule ReminderBot.Scheduler do
 
   defp run_async_sending(task) do
     Task.async fn ->
-      send_to_chat '189503234', task.text
+      send_to_chat task.chat_id, task.text
       DB.delete(task)
     end
   end
