@@ -9,8 +9,8 @@ defmodule ReminderBot.Scheduler do
       where: t.remind_at < datetime_add(^Ecto.DateTime.utc, 0, "minute")
 
     DB.all(tasks)
-      |> Enum.map(fn task -> run_async_sending(task) end)
-      |> Enum.map(fn task -> Task.await(task) end)
+    |> Enum.map(fn task -> run_async_sending(task) end)
+    |> Enum.map(fn task -> Task.await(task) end)
   end
 
   defp run_async_sending(task) do

@@ -1,5 +1,6 @@
 defmodule ReminderBot.Notificator do
   @bot_token Application.get_env(:reminder_bot, :token)
+  @redix_namespace Application.get_env(:reminder_bot, :redix_namespace)
   @url "https://api.telegram.org/bot#{@bot_token}/sendMessage"
   @url_update "https://api.telegram.org/bot#{@bot_token}/editMessageText"
   @no_keyboard Poison.encode!(%{remove_keyboard: true})
@@ -10,7 +11,7 @@ defmodule ReminderBot.Notificator do
     HTTPoison.post(@url, {:form, [chat_id: id, text: text, reply_markup: @no_keyboard]})
   end
 
-  def send_days(id, message_id) do
+  def send_days(id, _) do
     buttons = get_days_buttons(0)
     more_button = %{text: "дальше", callback_data: "change_week_1"}
     markup = Poison.encode! %{inline_keyboard: [buttons, [more_button]]}
@@ -49,14 +50,14 @@ defmodule ReminderBot.Notificator do
       markup = Poison.encode! %{inline_keyboard: [buttons, [prev_button], [@back_button]]}
     _ ->
       nil
+      markup = @empty_markup
     end
     update_inline(id, message_id, "Выберите час", markup)
   end
 
   def await_notification_text(datetime, id, message_id) do
     [day, month, year, hour] = String.split(datetime, "/")
-    {:ok, connection} = Redix.start_link()
-    Redix.command(connection, ["set", id, "#{message_id}/#{day}/#{month}/#{year}/#{hour}"])
+    Redix.command(:redix, ["set", "#{@redix_namespace}:#{id}", "#{message_id}/#{day}/#{month}/#{year}/#{hour}"])
     update_inline(id, message_id, "Введите напоминание на #{day}.#{month}.#{year} #{hour}:00 (или /c чтобы отменить)")
   end
 

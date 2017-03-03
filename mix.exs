@@ -24,7 +24,8 @@ defmodule ReminderBot.Mixfile do
         :quantum,
         :ecto,
         :postgrex,
-        :timex_ecto
+        :timex_ecto,
+        :crontab
       ],
       mod: {ReminderBot, []},
       env: [cowboy_port: 8080]
@@ -47,11 +48,12 @@ defmodule ReminderBot.Mixfile do
       {:poison, "~> 3.0"},
       {:httpoison, "~> 0.10.0"},
       {:redix, ">= 0.0.0"},
-      {:quantum, ">= 1.9.0"},
+      {:quantum, "~> 1.9"},
       {:ecto, "~> 2.1"},
       {:postgrex, ">= 0.0.0"},
       {:timex, "~> 3.0"},
-      {:timex_ecto, "~> 3.0"}
+      {:timex_ecto, "~> 3.0"},
+      {:distillery, "~> 1.0"}
     ]
   end
 end

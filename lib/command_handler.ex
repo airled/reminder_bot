@@ -1,8 +1,8 @@
 defmodule ReminderBot.CommandHandler do
-  import Ecto.Query
   import ReminderBot.Notificator
   alias ReminderBot.Repo, as: DB
   alias ReminderBot.Task
+  @redix_namespace Application.get_env(:reminder_bot, :redix_namespace)
   @help_text "Пожалуйста, используйте следующие команды:\n/id - узнать id текущего чата\n/s или /start - добавить новое напоминание"
 
   def handle_connection_request(%Plug.Conn{params: params} = conn) do
@@ -51,8 +51,7 @@ defmodule ReminderBot.CommandHandler do
   end
 
   defp check_for_awaiting(id, message_id, text) do
-    {:ok, connection} = Redix.start_link()
-    {:ok, value} = Redix.command(connection, ["get", id])
+    {:ok, value} = Redix.command(:redix, ["get", "#{@redix_namespace}:#{id}"])
     case value do
       x when x == nil or x == "" ->
         update_inline(id, message_id - 1)
@@ -88,8 +87,7 @@ defmodule ReminderBot.CommandHandler do
   end
 
   defp clear_user_awaiting(id) do
-    {:ok, connection} = Redix.start_link()
-    {:ok, value} = Redix.command(connection, ["set", id, ""])
+    Redix.command(:redix, ["del", "#{@redix_namespace}:#{id}"])
   end
 
   defp send_saving_result({:ok, _}, id) , do: send_to_chat(id, "Сохранено")

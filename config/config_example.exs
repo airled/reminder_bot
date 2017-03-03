@@ -30,6 +30,7 @@ use Mix.Config
 #     import_config "#{Mix.env}.exs"
 
 config :reminder_bot, token: ""
+config :reminder_bot, redix_namespace: "reminder_bot"
 config :reminder_bot, ecto_repos: [ReminderBot.Repo]
 config :reminder_bot, ReminderBot.Repo,
   adapter: Ecto.Adapters.Postgres,
