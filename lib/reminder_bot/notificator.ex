@@ -3,26 +3,29 @@ defmodule ReminderBot.Notificator do
   @redix_namespace Application.get_env(:reminder_bot, :redix_namespace)
   @url "https://api.telegram.org/bot#{@bot_token}/sendMessage"
   @url_update "https://api.telegram.org/bot#{@bot_token}/editMessageText"
-  @no_keyboard Poison.encode!(%{remove_keyboard: true})
   @back_button %{text: "выбрать другой день", callback_data: "change_week_0"}
+  @cancel_button %{text: "отменить", callback_data: "/c"}
   @empty_markup Poison.encode!(%{})
+  @no_keyboard Poison.encode!(%{remove_keyboard: true})
 
   def send_to_chat(id, text) do
     HTTPoison.post(@url, {:form, [chat_id: id, text: text, reply_markup: @no_keyboard]})
   end
 
   def send_days(id, _) do
-    buttons = get_days_buttons(0)
     more_button = %{text: "дальше", callback_data: "change_week_1"}
-    markup = Poison.encode! %{inline_keyboard: [buttons, [more_button]]}
+    buttons = get_days_buttons
+              |> Enum.concat [ [more_button], [@cancel_button] ]
+    markup = Poison.encode! %{inline_keyboard: buttons}
     HTTPoison.post(@url, {:form, [chat_id: id, text: "Выберите день", reply_markup: markup]})
   end
 
   def send_days(id, message_id, week_shift) do
-    buttons = get_days_buttons(week_shift)
     prev_button = %{text: "назад", callback_data: "change_week_#{week_shift - 1}"}
     more_button = %{text: "дальше", callback_data: "change_week_#{week_shift + 1}"}
-    markup = Poison.encode! %{inline_keyboard: [buttons, [prev_button, more_button]]}
+    buttons = get_days_buttons(week_shift)
+              |> Enum.concat [ [prev_button, more_button], [@cancel_button] ]
+    markup = Poison.encode! %{inline_keyboard: buttons}
     update_inline(id, message_id, "Выберите день", markup)
   end
 
@@ -31,23 +34,15 @@ defmodule ReminderBot.Notificator do
     date = "#{day}/#{month}/#{year}"
     case hour_shift do
     "0" ->
-      buttons = get_hours_buttons(0..5, date)
-      more_button = %{text: "дальше", callback_data: "get_hours_for_#{date}/6"}
-      markup = %{inline_keyboard: [buttons, [more_button], [@back_button]]}
-    "6" ->
-      buttons = get_hours_buttons(6..11, date)
-      prev_button = %{text: "назад", callback_data: "get_hours_for_#{date}/0"}
       more_button = %{text: "дальше", callback_data: "get_hours_for_#{date}/12"}
-      markup = %{inline_keyboard: [buttons, [prev_button, more_button], [@back_button]]}
+      buttons = get_hours_buttons(0..11, date)
+                |> Enum.concat [ [more_button], [@cancel_button, @back_button] ]
+      markup = %{inline_keyboard: buttons}
     "12" ->
-      buttons = get_hours_buttons(12..17, date)
-      prev_button = %{text: "назад", callback_data: "get_hours_for_#{date}/6"}
-      more_button = %{text: "дальше", callback_data: "get_hours_for_#{date}/18"}
-      markup = %{inline_keyboard: [buttons, [prev_button, more_button], [@back_button]]}
-    "18" ->
-      buttons = get_hours_buttons(18..23, date)
-      prev_button = %{text: "назад", callback_data: "get_hours_for_#{date}/12"}
-      markup = %{inline_keyboard: [buttons, [prev_button], [@back_button]]}
+      prev_button = %{text: "назад", callback_data: "get_hours_for_#{date}/0"}
+      buttons = get_hours_buttons(12..23, date)
+                |> Enum.concat [ [prev_button], [@cancel_button, @back_button] ]
+      markup = %{inline_keyboard: buttons}
     _ ->
       nil
       markup = %{}
@@ -67,21 +62,27 @@ defmodule ReminderBot.Notificator do
     )
   end
 
-  defp get_days_buttons(week_shift) do
-    Enum.map 0..5, fn day ->
+  def get_days_buttons(week_shift \\ 0) do
+    buttons = Enum.map 0..7, fn day ->
       day = Timex.shift(Timex.now(), days: day, weeks: week_shift)
             |> Timex.format!("%d/%m/%y", :strftime)
       %{text: String.slice(day, 0..4), callback_data: "get_hours_for_#{day}/0"}
     end
+    buttons
+    |> Enum.split(4)
+    |> Tuple.to_list
   end
 
   defp get_hours_buttons(range, date) do
-    Enum.map range, fn hour ->
+    buttons = Enum.map range, fn hour ->
       text = hour
              |> Integer.to_string
              |> String.pad_leading(2, "0")
       %{text: text, callback_data: "await#{date}/#{hour}"}
     end
+    buttons
+    |> Enum.split(6)
+    |> Tuple.to_list
   end
 
 end

@@ -39,6 +39,7 @@ defmodule ReminderBot.CommandHandler do
       "/c" ->
         clear_user_awaiting(id)
         update_inline(id, message_id - 1, "Отменено")
+        update_inline(id, message_id, "Отменено")
       "change_week_" <> week_shift ->
         send_days(id, message_id, (Integer.parse(week_shift) |> elem(0)))
       "get_hours_for_" <> date ->
