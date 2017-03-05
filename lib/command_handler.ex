@@ -18,7 +18,7 @@ defmodule ReminderBot.CommandHandler do
       }} ->
         handle_command([data], id, message_id, text)
       _ ->
-        IO.puts inspect params
+        IO.inspect params
     end
   end
 

@@ -33,26 +33,26 @@ defmodule ReminderBot.Notificator do
     "0" ->
       buttons = get_hours_buttons(0..5, date)
       more_button = %{text: "дальше", callback_data: "get_hours_for_#{date}/6"}
-      markup = Poison.encode! %{inline_keyboard: [buttons, [more_button], [@back_button]]}
+      markup = %{inline_keyboard: [buttons, [more_button], [@back_button]]}
     "6" ->
       buttons = get_hours_buttons(6..11, date)
       prev_button = %{text: "назад", callback_data: "get_hours_for_#{date}/0"}
       more_button = %{text: "дальше", callback_data: "get_hours_for_#{date}/12"}
-      markup = Poison.encode! %{inline_keyboard: [buttons, [prev_button, more_button], [@back_button]]}
+      markup = %{inline_keyboard: [buttons, [prev_button, more_button], [@back_button]]}
     "12" ->
       buttons = get_hours_buttons(12..17, date)
       prev_button = %{text: "назад", callback_data: "get_hours_for_#{date}/6"}
       more_button = %{text: "дальше", callback_data: "get_hours_for_#{date}/18"}
-      markup = Poison.encode! %{inline_keyboard: [buttons, [prev_button, more_button], [@back_button]]}
+      markup = %{inline_keyboard: [buttons, [prev_button, more_button], [@back_button]]}
     "18" ->
       buttons = get_hours_buttons(18..23, date)
       prev_button = %{text: "назад", callback_data: "get_hours_for_#{date}/12"}
-      markup = Poison.encode! %{inline_keyboard: [buttons, [prev_button], [@back_button]]}
+      markup = %{inline_keyboard: [buttons, [prev_button], [@back_button]]}
     _ ->
       nil
-      markup = @empty_markup
+      markup = %{}
     end
-    update_inline(id, message_id, "Выберите час", markup)
+    update_inline(id, message_id, "Выберите час на #{day}.#{month}", Poison.encode! markup)
   end
 
   def await_notification_text(datetime, id, message_id) do
@@ -77,7 +77,10 @@ defmodule ReminderBot.Notificator do
 
   defp get_hours_buttons(range, date) do
     Enum.map range, fn hour ->
-      %{text: Integer.to_string(hour), callback_data: "await#{date}/#{hour}"}
+      text = hour
+             |> Integer.to_string
+             |> String.pad_leading(2, "0")
+      %{text: text, callback_data: "await#{date}/#{hour}"}
     end
   end
 
