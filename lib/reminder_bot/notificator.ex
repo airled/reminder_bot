@@ -6,26 +6,26 @@ defmodule ReminderBot.Notificator do
   @back_button %{text: "выбрать другой день", callback_data: "change_week_0"}
   @cancel_button %{text: "отменить", callback_data: "/c"}
   @empty_markup Poison.encode!(%{})
-  @no_keyboard Poison.encode!(%{remove_keyboard: true})
+  @no_keyboard_markup Poison.encode!(%{remove_keyboard: true})
 
   def send_to_chat(id, text) do
-    HTTPoison.post(@url, {:form, [chat_id: id, text: text, reply_markup: @no_keyboard]})
+    HTTPoison.post(@url, {:form, [chat_id: id, text: text, reply_markup: @no_keyboard_markup]})
   end
 
   def send_days(id, _) do
     more_button = %{text: "дальше", callback_data: "change_week_1"}
-    buttons = get_days_buttons
-              |> Enum.concat [ [more_button], [@cancel_button] ]
-    markup = Poison.encode! %{inline_keyboard: buttons}
+    markup = get_days_buttons
+             |> Enum.concat([ [more_button], [@cancel_button] ])
+             |> build_inline_markup
     HTTPoison.post(@url, {:form, [chat_id: id, text: "Выберите день", reply_markup: markup]})
   end
 
   def send_days(id, message_id, week_shift) do
     prev_button = %{text: "назад", callback_data: "change_week_#{week_shift - 1}"}
     more_button = %{text: "дальше", callback_data: "change_week_#{week_shift + 1}"}
-    buttons = get_days_buttons(week_shift)
-              |> Enum.concat [ [prev_button, more_button], [@cancel_button] ]
-    markup = Poison.encode! %{inline_keyboard: buttons}
+    markup = get_days_buttons(week_shift)
+             |> Enum.concat([ [prev_button, more_button], [@cancel_button] ])
+             |> build_inline_markup
     update_inline(id, message_id, "Выберите день", markup)
   end
 
@@ -35,19 +35,19 @@ defmodule ReminderBot.Notificator do
     case hour_shift do
     "0" ->
       more_button = %{text: "дальше", callback_data: "get_hours_for_#{date}/12"}
-      buttons = get_hours_buttons(0..11, date)
-                |> Enum.concat [ [more_button], [@cancel_button, @back_button] ]
-      markup = %{inline_keyboard: buttons}
+      markup = get_hours_buttons(0..11, date)
+               |> Enum.concat([ [more_button], [@cancel_button, @back_button] ])
+               |> build_inline_markup
     "12" ->
       prev_button = %{text: "назад", callback_data: "get_hours_for_#{date}/0"}
-      buttons = get_hours_buttons(12..23, date)
-                |> Enum.concat [ [prev_button], [@cancel_button, @back_button] ]
-      markup = %{inline_keyboard: buttons}
+      markup = get_hours_buttons(12..23, date)
+               |> Enum.concat([ [prev_button], [@cancel_button, @back_button] ])
+               |> build_inline_markup
     _ ->
       nil
-      markup = %{}
+      markup = @empty_markup
     end
-    update_inline(id, message_id, "Выберите час на #{day}.#{month}", Poison.encode! markup)
+    update_inline(id, message_id, "Выберите час на #{day}.#{month}", markup)
   end
 
   def await_notification_text(datetime, id, message_id) do
@@ -83,6 +83,10 @@ defmodule ReminderBot.Notificator do
     buttons
     |> Enum.split(6)
     |> Tuple.to_list
+  end
+
+  defp build_inline_markup(buttons) do
+    Poison.encode! %{inline_keyboard: buttons}
   end
 
 end
