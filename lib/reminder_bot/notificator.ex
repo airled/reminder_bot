@@ -12,7 +12,7 @@ defmodule ReminderBot.Notificator do
     HTTPoison.post(@url, {:form, [chat_id: id, text: text, reply_markup: @no_keyboard_markup]})
   end
 
-  def send_days(id, _) do
+  def send_days(id) do
     more_button = %{text: "дальше", callback_data: "change_week_1"}
     markup = get_days_buttons
              |> Enum.concat([ [more_button], [@cancel_button] ])

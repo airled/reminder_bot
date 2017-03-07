@@ -35,13 +35,13 @@ defmodule ReminderBot.CommandHandler do
       x when x == "/s" or x == "/start" ->
         clear_user_awaiting(id)
         update_inline(id, message_id - 1)
-        send_days(id, message_id)
+        send_days(id)
       "/c" ->
         clear_user_awaiting(id)
         update_inline(id, message_id - 1, "Отменено")
         update_inline(id, message_id, "Отменено")
       "change_week_" <> week_shift ->
-        send_days(id, message_id, (Integer.parse(week_shift) |> elem(0)))
+        send_days(id, message_id, String.to_integer(week_shift))
       "get_hours_for_" <> date ->
         send_hours_for_date(id, date, message_id)
       "await" <> datetime ->
@@ -60,7 +60,7 @@ defmodule ReminderBot.CommandHandler do
       _ ->
 
         with [previous_message_id, day, month, year, hour] <- String.split(value, "/"),
-             previous_message_id_as_integer <- Integer.parse(previous_message_id) |> elem(0) do
+             previous_message_id_as_integer <- String.to_integer(previous_message_id) do
 
             if message_id == previous_message_id_as_integer + 1 do
               handle_saving({day, month, year, hour}, id, text)

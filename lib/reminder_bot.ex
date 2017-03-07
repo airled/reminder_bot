@@ -6,7 +6,7 @@ defmodule ReminderBot do
     children = [
       Plug.Adapters.Cowboy.child_spec(:http, ReminderBot.Router, [], port: 8080),
       supervisor(ReminderBot.Repo, []),
-      supervisor(Redix, [[], [name: :redix]])
+      worker(Redix, [[], [name: :redix]])
     ]
 
     Supervisor.start_link(children, strategy: :one_for_one)
