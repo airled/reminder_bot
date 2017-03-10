@@ -1,9 +1,9 @@
 defmodule ReminderBot.CommandHandler do
-  import ReminderBot.Notificator
+  import ReminderBot.Messenger
   alias ReminderBot.Repo, as: DB
   alias ReminderBot.Task
   @redix_namespace Application.get_env(:reminder_bot, :redix_namespace)
-  @help_text "Пожалуйста, используйте следующие команды:\n/id - узнать id текущего чата\n/s или /start - добавить новое напоминание"
+  @help_text "Пожалуйста, используйте следующие команды:\n/id - узнать id текущего чата\n/s или /start - добавить новое напоминание\n/l или /list - посмотреть список своих будущих напоминаний"
 
   def handle_connection_request(%Plug.Conn{params: params} = conn) do
     case params do
@@ -32,10 +32,14 @@ defmodule ReminderBot.CommandHandler do
         clear_user_awaiting(id)
         update_inline(id, message_id - 1)
         send_to_chat(id, id)
-      x when x == "/s" or x == "/start" ->
+      command when command == "/s" or command == "/start" ->
         clear_user_awaiting(id)
         update_inline(id, message_id - 1)
         send_days(id)
+      command when command == "/l" or command == "/list" ->
+        clear_user_awaiting(id)
+        update_inline(id, message_id - 1)
+        send_list(id)
       "/c" ->
         clear_user_awaiting(id)
         update_inline(id, message_id - 1, "Отменено")
@@ -56,7 +60,7 @@ defmodule ReminderBot.CommandHandler do
     case value do
       x when x == nil or x == "" ->
         update_inline(id, message_id - 1)
-        send_to_chat(id, @help_text)
+        send_to_chat(@help_text, id)
       _ ->
 
         with [previous_message_id, day, month, year, hour] <- String.split(value, "/"),
@@ -66,14 +70,14 @@ defmodule ReminderBot.CommandHandler do
               handle_saving({day, month, year, hour}, id, text)
             else
               update_inline(id, message_id - 1)
-              send_to_chat(id, @help_text)
+              send_to_chat(@help_text, id)
             end
             clear_user_awaiting(id)
 
         else
           _ ->
             update_inline(id, message_id - 1)
-            send_to_chat(id, @help_text)
+            send_to_chat(@help_text, id)
         end
 
     end
@@ -91,7 +95,7 @@ defmodule ReminderBot.CommandHandler do
     Redix.command(:redix, ["del", "#{@redix_namespace}:#{id}"])
   end
 
-  defp send_saving_result({:ok, _}, id) , do: send_to_chat(id, "Сохранено")
+  defp send_saving_result({:ok, _}, id) , do: send_to_chat("Сохранено", id)
   defp send_saving_result({_, reason}, id) do
     send_to_chat(id, "Не получилось сохранить (#{inspect reason})")
   end

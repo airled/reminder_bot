@@ -1,4 +1,7 @@
-defmodule ReminderBot.Notificator do
+defmodule ReminderBot.Messenger do
+  import Ecto.Query
+  alias ReminderBot.Repo, as: DB
+
   @bot_token Application.get_env(:reminder_bot, :token)
   @redix_namespace Application.get_env(:reminder_bot, :redix_namespace)
   @url "https://api.telegram.org/bot#{@bot_token}/sendMessage"
@@ -8,7 +11,7 @@ defmodule ReminderBot.Notificator do
   @empty_markup Poison.encode!(%{})
   @no_keyboard_markup Poison.encode!(%{remove_keyboard: true})
 
-  def send_to_chat(id, text) do
+  def send_to_chat(text, id) do
     HTTPoison.post(@url, {:form, [chat_id: id, text: text, reply_markup: @no_keyboard_markup]})
   end
 
@@ -71,6 +74,16 @@ defmodule ReminderBot.Notificator do
     buttons
     |> Enum.split(4)
     |> Tuple.to_list
+  end
+
+  def send_list(id) do
+    ReminderBot.Task
+    |> where(chat_id: ^Integer.to_string(id))
+    |> order_by(:remind_at)
+    |> DB.all
+    |> Enum.reduce("", fn(task, memo) -> memo <> "#{task.remind_at} | #{task.text}\n" end)
+    |> String.replace(":00.000000Z", "")
+    |> send_to_chat(id)
   end
 
   defp get_hours_buttons(range, date) do

@@ -1,6 +1,6 @@
 defmodule ReminderBot.Scheduler do
   import Ecto.Query
-  import ReminderBot.Notificator
+  import ReminderBot.Messenger
   alias ReminderBot.Repo, as: DB
 
   def remind do
@@ -15,7 +15,7 @@ defmodule ReminderBot.Scheduler do
 
   defp run_async_sending(task) do
     Task.async fn ->
-      send_to_chat task.chat_id, task.text
+      send_to_chat task.text, task.chat_id
       DB.delete(task)
     end
   end

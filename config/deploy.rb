@@ -19,7 +19,7 @@ end
 
 desc "Deploys the current version to the server."
 task :deploy do
-  # invoke :'git:ensure_pushed'
+  invoke :'git:ensure_pushed'
   deploy do
     invoke :'git:clone'
     invoke :'deploy:link_shared_paths'
@@ -31,6 +31,9 @@ task :deploy do
       end
     end
   end
+  invoke :deps
+  invoke :compile
+  invoke :migrate
 end
 
 desc "Gets dependencies"
