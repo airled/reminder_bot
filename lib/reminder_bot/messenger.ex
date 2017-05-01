@@ -71,9 +71,7 @@ defmodule ReminderBot.Messenger do
             |> Timex.format!("%d/%m/%y", :strftime)
       %{text: String.slice(day, 0..4), callback_data: "get_hours_for_#{day}/0"}
     end
-    buttons
-    |> Enum.split(4)
-    |> Tuple.to_list
+    Enum.chunk(buttons, 4)
   end
 
   def send_list(id) do
@@ -93,9 +91,7 @@ defmodule ReminderBot.Messenger do
              |> String.pad_leading(2, "0")
       %{text: text, callback_data: "await#{date}/#{hour}"}
     end
-    buttons
-    |> Enum.split(6)
-    |> Tuple.to_list
+    Enum.chunk(buttons, 6)
   end
 
   defp build_inline_markup(buttons) do
