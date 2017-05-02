@@ -1,14 +1,12 @@
 defmodule ReminderBot.Scheduler do
   import Ecto.Query
   import ReminderBot.Messenger
-  alias ReminderBot.Repo, as: DB
+  alias ReminderBot.Repo
 
   def remind do
-    tasks =
-      from t in ReminderBot.Task,
-      where: t.remind_at < datetime_add(^Ecto.DateTime.utc, 0, "minute")
-
-    DB.all(tasks)
+    ReminderBot.Task
+    |> where([t], t.remind_at < ^Timex.now)
+    |> Repo.all
     |> Enum.map(fn task -> run_async_sending(task) end)
     |> Enum.map(fn task -> Task.await(task) end)
   end
@@ -16,7 +14,7 @@ defmodule ReminderBot.Scheduler do
   defp run_async_sending(task) do
     Task.async fn ->
       send_to_chat task.text, task.chat_id
-      DB.delete(task)
+      Repo.delete(task)
     end
   end
 

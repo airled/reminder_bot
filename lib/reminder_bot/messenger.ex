@@ -1,6 +1,6 @@
 defmodule ReminderBot.Messenger do
   import Ecto.Query
-  alias ReminderBot.Repo, as: DB
+  alias ReminderBot.Repo
 
   @bot_token Application.get_env(:reminder_bot, :token)
   @redix_namespace Application.get_env(:reminder_bot, :redix_namespace)
@@ -78,7 +78,7 @@ defmodule ReminderBot.Messenger do
     ReminderBot.Task
     |> where(chat_id: ^Integer.to_string(id))
     |> order_by(:remind_at)
-    |> DB.all
+    |> Repo.all
     |> Enum.reduce("", fn(task, memo) -> memo <> "#{task.remind_at} | #{task.text}\n" end)
     |> String.replace(":00.000000Z", "")
     |> send_to_chat(id)

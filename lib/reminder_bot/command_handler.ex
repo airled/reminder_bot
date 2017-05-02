@@ -1,6 +1,6 @@
 defmodule ReminderBot.CommandHandler do
   import ReminderBot.Messenger
-  alias ReminderBot.Repo, as: DB
+  alias ReminderBot.Repo
   alias ReminderBot.Task
   @redix_namespace Application.get_env(:reminder_bot, :redix_namespace)
   @help_text "Пожалуйста, используйте следующие команды:\n/id - узнать id текущего чата\n/s или /start - добавить новое напоминание\n/l или /list - посмотреть список своих будущих напоминаний"
@@ -87,7 +87,7 @@ defmodule ReminderBot.CommandHandler do
     padded_hour = String.pad_leading(hour, 2, "0")
     {:ok, remind_at, _} = DateTime.from_iso8601("20#{year}-#{month}-#{day}T#{padded_hour}:00:00Z")
     %Task{text: text, remind_at: remind_at, chat_id: Integer.to_string(id)}
-    |> DB.insert
+    |> Repo.insert
     |> send_saving_result(id)
   end
 
