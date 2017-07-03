@@ -38,3 +38,8 @@ config :reminder_bot, ReminderBot.Repo,
   username: "username",
   password: "password",
   hostname: "localhost"
+
+config :quantum, :reminder_bot,
+  cron: [
+    "* * * * *": {ReminderBot.Scheduler, :remind}
+  ]
