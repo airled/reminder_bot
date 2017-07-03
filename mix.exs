@@ -46,7 +46,7 @@ defmodule ReminderBot.Mixfile do
       {:plug, "~> 1.0"},
       {:cowboy, "~> 1.0"},
       {:poison, "~> 3.0"},
-      {:httpoison, "~> 0.10.0"},
+      {:httpoison, "~> 0.12.0"},
       {:redix, ">= 0.0.0"},
       {:quantum, "~> 1.9"},
       {:ecto, "~> 2.1"},
