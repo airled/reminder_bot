@@ -5,6 +5,7 @@ defmodule ReminderBot.Scheduler do
 
   def remind do
     ReminderBot.Task
+    |> preload(:chat)
     |> where([t], t.remind_at < ^Timex.now)
     |> Repo.all
     |> Enum.map(fn task -> run_async_sending(task) end)
@@ -13,7 +14,7 @@ defmodule ReminderBot.Scheduler do
 
   defp run_async_sending(task) do
     Task.async fn ->
-      send_to_chat task.text, task.chat_id
+      send_to_chat(task.text, task.chat)
       Repo.delete(task)
     end
   end

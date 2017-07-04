@@ -1,9 +1,10 @@
 defmodule ReminderBot.CommandHandler do
   import ReminderBot.Messenger
   alias ReminderBot.Repo
+  alias ReminderBot.Chat
   alias ReminderBot.Task
   @redix_namespace Application.get_env(:reminder_bot, :redix_namespace)
-  @help_text "Пожалуйста, используйте следующие команды:\n/id - узнать id текущего чата\n/s или /start - добавить новое напоминание\n/l или /list - посмотреть список своих будущих напоминаний"
+  @help_text "Пожалуйста, используйте следующие команды:\n/s или /start - добавить новое напоминание\n/l или /list - посмотреть список своих будущих напоминаний\n/tz или /timezone - настрока своей таймзоны"
 
   def handle_connection_request(%Plug.Conn{params: params} = conn) do
     case params do
@@ -27,76 +28,92 @@ defmodule ReminderBot.CommandHandler do
     handle_command([command, nil], id, message_id, text)
   end
   defp handle_command([command, options], id, message_id, text) do
+    chat = save_chat(id)
     case command do
-      "/id" ->
-        clear_user_awaiting(id)
-        update_inline(id, message_id - 1)
-        send_to_chat(id, id)
       command when command == "/s" or command == "/start" ->
-        clear_user_awaiting(id)
-        update_inline(id, message_id - 1)
-        send_days(id)
+        clear_user_awaiting(chat)
+        delete_message(chat, message_id - 1)
+        send_days(chat)
       command when command == "/l" or command == "/list" ->
-        clear_user_awaiting(id)
-        update_inline(id, message_id - 1)
-        send_list(id)
+        clear_user_awaiting(chat)
+        delete_message(chat, message_id - 1)
+        send_list(chat)
+      command when command == "/tz" or command == "/timezone" ->
+        clear_user_awaiting(chat)
+        delete_message(chat, message_id - 1)
+        send_timezones(chat)
       "/c" ->
-        clear_user_awaiting(id)
-        update_inline(id, message_id - 1, "Отменено")
-        update_inline(id, message_id, "Отменено")
+        clear_user_awaiting(chat)
+        delete_message(chat, message_id - 1)
+        delete_message(chat, message_id)
+      "set_zone_" <> zone ->
+        Ecto.Changeset.change(chat, timezone: "#{zone}:00") |> Repo.update!
+        delete_message(chat, message_id)
+        send_to_chat("Выбран часовой пояс #{zone}", chat)
       "change_week_" <> week_shift ->
-        send_days(id, message_id, String.to_integer(week_shift))
+        send_days(chat, message_id, String.to_integer(week_shift))
       "get_hours_for_" <> date ->
-        send_hours_for_date(id, date, message_id)
+        send_hours_for_date(chat, date, message_id)
       "await" <> datetime ->
-        await_notification_text(datetime, id, message_id)
+        send_await_notification_text(datetime, chat, message_id)
       _ ->
-        check_for_awaiting(id, message_id, text)
+        check_for_awaiting(chat, message_id, text)
     end
   end
 
-  defp check_for_awaiting(id, message_id, text) do
-    {:ok, value} = Redix.command(:redix, ["get", "#{@redix_namespace}:#{id}"])
+  defp check_for_awaiting(chat, message_id, text) do
+    {:ok, value} = Redix.command(:redix, ["get", "#{@redix_namespace}:#{chat.telegram_id}"])
     case value do
       x when x == nil or x == "" ->
-        update_inline(id, message_id - 1)
-        send_to_chat(@help_text, id)
+        delete_message(chat, message_id - 1)
+        send_to_chat(@help_text, chat)
       _ ->
 
         with [previous_message_id, day, month, year, hour] <- String.split(value, "/"),
              previous_message_id_as_integer <- String.to_integer(previous_message_id) do
 
             if message_id == previous_message_id_as_integer + 1 do
-              handle_saving({day, month, year, hour}, id, text)
+              handle_saving({day, month, year, hour}, chat, text)
             else
-              update_inline(id, message_id - 1)
-              send_to_chat(@help_text, id)
+              delete_message(chat, message_id - 1)
+              send_to_chat(@help_text, chat)
             end
-            clear_user_awaiting(id)
+            clear_user_awaiting(chat)
 
         else
           _ ->
-            update_inline(id, message_id - 1)
-            send_to_chat(@help_text, id)
+            delete_message(chat, message_id - 1)
+            send_to_chat(@help_text, chat)
         end
 
     end
   end
 
-  defp handle_saving({day, month, year, hour}, id, text) do
+  defp handle_saving({day, month, year, hour}, chat, text) do
     padded_hour = String.pad_leading(hour, 2, "0")
-    {:ok, remind_at, _} = DateTime.from_iso8601("20#{year}-#{month}-#{day}T#{padded_hour}:00:00Z")
-    %Task{text: text, remind_at: remind_at, chat_id: Integer.to_string(id)}
+    IO.inspect "20#{year}-#{month}-#{day}T#{padded_hour}:00:00#{chat.timezone}"
+    {:ok, remind_at, _} = DateTime.from_iso8601("20#{year}-#{month}-#{day}T#{padded_hour}:00:00#{chat.timezone}")
+    %Task{text: text, remind_at: remind_at, chat_id: chat.id}
     |> Repo.insert
-    |> send_saving_result(id)
+    |> send_saving_result(chat)
   end
 
-  defp clear_user_awaiting(id) do
-    Redix.command(:redix, ["del", "#{@redix_namespace}:#{id}"])
+  defp clear_user_awaiting(chat) do
+    Redix.command(:redix, ["del", "#{@redix_namespace}:#{chat.telegram_id}"])
   end
 
-  defp send_saving_result({:ok, _}, id) , do: send_to_chat("Сохранено", id)
-  defp send_saving_result({_, reason}, id) do
-    send_to_chat(id, "Не получилось сохранить (#{inspect reason})")
+  defp send_saving_result({:ok, _}, chat) , do: send_to_chat("Сохранено", chat)
+  defp send_saving_result({_, reason}, chat) do
+    send_to_chat(chat, "Не получилось сохранить (#{inspect reason})")
+  end
+
+  defp save_chat(telegram_id) do
+    chat = Repo.get_by(Chat, telegram_id: Integer.to_string(telegram_id))
+    case chat do
+      nil
+        -> Repo.insert!(%Chat{telegram_id: Integer.to_string(telegram_id), timezone: "+00:00"})
+      _
+        -> chat
+    end
   end
 end
