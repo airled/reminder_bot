@@ -4,7 +4,7 @@ defmodule ReminderBot.CommandHandler do
   alias ReminderBot.Chat
   alias ReminderBot.Task
   @redix_namespace Application.get_env(:reminder_bot, :redix_namespace)
-  @help_text "Пожалуйста, используйте следующие команды:\n/s или /start - добавить новое напоминание\n/l или /list - посмотреть список своих будущих напоминаний\n/tz или /timezone - настрока своей таймзоны"
+  @help_text "Пожалуйста, используйте следующие команды:\n/s или /start - добавить новое напоминание\n/l или /list - посмотреть список своих будущих напоминаний\n/tz или /timezone - настройка своей таймзоны"
 
   def handle_connection_request(%Plug.Conn{params: params} = conn) do
     case params do
